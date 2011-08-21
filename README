@@ -1,0 +1,99 @@
+REDIS Server SNMP Agent.
+Copyright (c) 2011 Brice Figureau <brice.figureau@daysofwonder.com>
+
+PREAMBLE
+========
+
+redis-snmp is a Redis Net-SNMP agent written in Perl, and using the Net-Snmp 
+Perl bindings.
+
+It connects to a redis server and returns information to Net-SNMP when needed.
+It parses the Redis INFO command results.
+
+This work is based on Baron Schwartz Mysql Cacti Templates, available at:
+http://code.google.com/p/mysql-cacti-templates/
+
+This software is released under the GPL v2.
+
+REQUIREMENTS
+============
+
+This package requires Net-SNMP version 5.4.3 or better. Previous versions have bugs preventing
+returning 64 bits MIBs objects correctly from a perl agentX.
+
+INSTALL
+=======
+
+Debian
+------
+
+Please build the package:
+$ dpkg-buildpackage -rfakeroot -uc- b
+
+and install it
+Then, modify /etc/default/redis-snmp
+
+Other
+-----
+
+Modify the Makefile, and:
+$ sudo make install
+
+Then create an init.d startup script. You can look to the debian one
+in debian/init.d
+
+Install the MIB file in your mibs directory.
+
+CONFIGURE
+=========
+
+Configure net-snmp
+------------------
+
+Add:
+master agentx
+to /etc/snmp/snmpd.conf, and restart snmpd
+Make sure the redis-snmp agent is able to open the agentX socket (permissions
+and location of said socket can be managed with the snmpd.conf agentXPerms
+directive).
+
+Configure redis-snmp
+--------------------
+
+Under debian, the daemon can be configured with /etc/default/redis-snmp.
+On all platform, the configuration is done with command line arguments:
+
+-h|--host HOST          connect to redis HOST
+-P|--port PORT          port to connect to (default 6379)
+-p|--password DBPASS   use DBPASS as password to connect to redis
+--oid OID               registering OID
+-i|--refresh            refresh interval in seconds
+
+OPENNMS
+=======
+
+You'll find in the opennms directory the various configuration snippets
+that can be used to let opennms graph the value reported by this agent.
+
+datacollection-config.xml
+-------------------------
+
+Add the content of opennms/redis.datacollection-config.xml to
+your datacollection-config.xml file.
+
+Then add this group to your hosts:
+<systemDef name="Net-Snmp">
+  <sysoidMask>.1.3.6.1.4.1.8072.3.</sysoidMask>
+  <collect>
+    <includeGroup>mib2-host-resources-system</includeGroup>
+    <includeGroup>mib2-host-resources-memory</includeGroup>
+    <includeGroup>net-snmp-disk</includeGroup>
+    <includeGroup>ucd-loadavg</includeGroup>
+    <includeGroup>ucd-memory</includeGroup>
+    <includeGroup>ucd-sysstat</includeGroup>
+    <includeGroup>redis</includeGroup>
+  </collect>
+</systemDef>
+
+And now, add the graph definitions from the opennms/redis.snmp-graph.properties file 
+to your snmp-graph.properties.

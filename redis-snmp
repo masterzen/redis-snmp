@@ -1,0 +1,530 @@
+#!/usr/bin/env perl
+#
+#
+# This program implements a SNMP agent for Redis servers
+#
+# (c) Copryright 2011 - Brice Figureau
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.    See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+use strict;
+use warnings;
+use Data::Dumper;
+use IO::Socket::INET;
+use IO::Handle;
+use Data::Dumper;
+use Carp qw/confess croak/;
+use Unix::Syslog qw(:subs :macros);
+use Getopt::Long qw(:config auto_help auto_version no_ignore_case);
+use POSIX qw( setsid );
+use NetSNMP::OID (':all');
+use NetSNMP::agent(':all');
+use NetSNMP::ASN(':all');
+use NetSNMP::agent::default_store;
+use NetSNMP::default_store qw(:all);
+use SNMP;
+use Pod::Usage;
+
+my $VERSION = "v0.1_01";
+$VERSION = eval $VERSION;
+
+
+my %opt = (
+    daemon_pid => '/var/run/mysql-snmp.pid',
+    oid        => '1.3.6.1.4.1.20267.400.1',
+    port       => 6379,
+    refresh    => 300,
+    host       => 'localhost',
+);
+
+my %global_status       = ();
+my $global_last_refresh = 0;
+my $running = 0;
+my $error   = 0;
+# this will hold a table of conversion between numerical oids and oidnames
+my %oids    = ();
+my $lowestOid;
+my $highestOid;
+my @ks;
+my $regOID;
+
+my @types = (
+    'Gauge32', 'Gauge32', 'Counter64', 'Gauge32',  # 1 - 4
+    'Counter64', 'Counter64',  # 5 - 6
+);
+
+my @newkeys = (
+    'redisConnectedClients', 'redisConnectedSlaves',  # 1 - 2
+    'redisUsedMemory', 'redisChangesSinceLastSave',  # 3 - 4
+    'redisTotalConnections', 'redisCommandsProcessed',  # 5 - 6
+);
+
+my @oldkeys = (
+    'connected_clients', 'connected_slaves',  # 1 - 2
+    'used_memory', 'changes_since_last_save',  # 3 - 4
+    'total_connections_received', 'total_commands_processed',  # 5 - 6
+);
+
+run() unless caller();
+
+sub read_response($) {
+  my $sock = shift;
+
+  my ($type, $result) = read_line($sock);
+
+  if ($type eq '-') {
+    confess "Redis error $result, ";
+  }
+  elsif ($type eq '+') {
+    return $result;
+  }
+  elsif ($type eq '$') {
+    return if $result < 0;
+    return read_len($sock, $result + 2);
+  }
+  else {
+    confess "return type not implemented: $type ($result), ";
+  }
+}
+
+sub read_line($) {
+  my $sock = shift;
+
+  my $data = <$sock>;
+  confess("Error while reading from Redis server: $!")
+    unless defined $data;
+
+  chomp $data;
+
+  my $type = substr($data, 0, 1, '');
+  return ($type, $data);
+}
+
+sub read_len($$) {
+  my ($sock, $len) = @_;
+
+  my $data;
+  my $offset = 0;
+  while ($len) {
+    my $bytes = read $sock, $data, $len, $offset;
+    confess("Error while reading from Redis server: $!")
+      unless defined $bytes;
+    confess("Redis server closed connection") unless $bytes;
+
+    $offset += $bytes;
+    $len -= $bytes;
+  }
+
+  chomp $data;
+
+  return $data;
+}
+
+sub send_buffer($$) {
+    my $sock = shift;
+    my $buf = shift;
+
+    while ($buf) {
+      my $len = syswrite $sock, $buf, length $buf;
+      confess("Could not write to Redis server: $!") unless $len;
+      substr $buf, 0, $len, "";
+    }
+}
+
+sub redis_send_auth_command($$) {
+    my $sock = shift || confess("Not connected to any server");
+    my $pass = shift;
+
+    my $buf = "*2\r\n\$4\r\nAUTH\r\n\$" . length($pass) . "\r\n$pass\r\n";
+
+    send_buffer($sock, $buf);
+    return;
+}
+
+sub redis_send_info_command($) {
+    my $sock = shift || confess("Not connected to any server");
+
+    my $buf = "*1\r\n\$4\r\nINFO\r\n";
+
+    send_buffer($sock, $buf);
+    return;
+}
+
+
+sub fetch_redis_data {
+    my ($host, $port, $pass) = @_;
+    my %output;
+    eval {
+        my $sock = IO::Socket::INET->new(
+          PeerAddr => "$host:$port",
+          Proto    => 'tcp',
+        ) || confess("Could not connect to Redis server at $host:$port: $!");
+
+        if ($pass) {
+            redis_send_auth_command($sock, $pass);
+            read_response($sock);
+        }
+
+        redis_send_info_command($sock);
+        my $info = read_response($sock);
+        chop($info);
+        my $status = {map { split(/:/, $_, 2) } split(/\r\n/, $info)};
+
+        my %trans;
+        my $i = 0;
+        foreach my $key (@oldkeys) {
+            $trans{$key} = $newkeys[$i++];
+        }
+
+        foreach my $key (keys %$status) {
+            $output{$trans{$key}} = $status->{$key} if (exists($trans{$key}));
+        }
+    };
+    if ($@) {
+        dolog(LOG_CRIT, "can't refresh data from redis: $@\n");
+        return (undef, undef, undef);
+    }
+    return(\@newkeys, \@types, \%output);
+}
+
+# daemonize the program
+sub daemonize {
+    open STDIN, '/dev/null' or die "redis-snmp: can't read /dev/null: $!";
+    open STDOUT, '>/dev/null' or die "redis-snmp: can't write to /dev/null: $!";
+    defined(my $pid = fork) or die "redis-snmp: can't fork: $!";
+    if ($pid) {
+        # parent
+        open my $pidfile, '>', $opt{daemon_pid}
+          or croak "Couldn't open $opt{daemon_pid} for writing: $!";
+        print {$pidfile} "$pid\n" or croak "Couldn't write pid to $opt{daemon_pid}: $!";
+        close $pidfile or croak "Couldn't close $opt{daemon_pid}: $!";
+        exit;
+    }
+
+    # child
+    setsid() or die "redis-snmp: can't start a new session: $!";
+    open STDERR, '>&STDOUT' or die "redis-snmp: can't dup stdout: $!";
+}
+
+
+###
+### Called automatically now and then
+### Refreshes the $global_status and $global_variables
+### caches.
+###
+sub refresh_status {
+    my $startOID = shift;
+    my $host     = shift;
+    my $port     = shift;
+    my $now      = time();
+
+    # Check if we have been called quicker than once every $refresh
+    if (($now - $global_last_refresh) < $opt{refresh}) {
+        # if yes, do not do anything
+        dolog(LOG_DEBUG, "not refreshing: " . ($now - $global_last_refresh) . " < $opt{refresh}") if ($opt{verbose});
+        return;
+    }
+    my ($oid, $types, $status) = fetch_redis_data($host, $port, $opt{password});
+    if ($oid) {
+        dolog(LOG_DEBUG, "Setting error to 0") if ($opt{verbose});
+        $error = 0;
+        my $index = 0;
+        foreach my $key (@$oid) {
+            $global_status{$key}{'value'} = $status->{$key};
+            $global_status{$key}{'type'}  = $types->[$index];
+            $index++;
+        }
+        dolog(LOG_DEBUG, "Refreshed at $now " . (time() - $now)) if ($opt{verbose});
+        print Dumper(\%global_status) if ($opt{verbose});
+    }
+    else {
+        dolog(LOG_DEBUG, "Setting error to 1") if ($opt{verbose});
+        $error = 1;
+    }
+
+    $global_last_refresh = $now;
+    return;
+}
+
+sub getASNType {
+    my $type = shift;
+    if ($type eq 'Counter32') {
+        return ASN_COUNTER;
+    }
+    elsif ($type eq 'Gauge32') {
+        return ASN_GAUGE;
+    }
+    elsif ($type eq 'Counter64') {
+        return ASN_COUNTER64;
+    }
+    elsif ($type eq 'OID') {
+        return ASN_OBJECT_ID;
+    }
+    return ASN_OCTET_STR;
+}
+
+sub shut_it_down {
+    $running = 0;
+    dolog(LOG_INFO, "shutting down");
+}
+
+sub set_value {
+    my ($request, $oid, $request_info) = @_;
+
+    if (!$error) {
+        my $oidname = $oids{$oid}->{'name'};
+        if (!defined $oidname) {
+            if ($oid != $regOID) {
+                dolog(LOG_INFO, "OID $oid is not available");
+                $request->setError($request_info, SNMP_ERR_NOSUCHNAME);
+            }
+            return 0;
+        }
+
+        my $value = $global_status{$oidname}{'value'};
+        if (defined $value) {
+            if ($opt{verbose}) {
+                dolog(LOG_DEBUG, "$oid -> $lowestOid");
+                dolog(LOG_DEBUG, "  -> ($oidname) $value");
+            }
+            $request->setOID($oid);
+            $request->setValue(getASNType($global_status{$oidname}{'type'}), "$value");
+        }
+        else {
+            dolog(LOG_DEBUG, "OID $oid has no value") if ($opt{verbose});
+            return 0;
+        }
+    }
+    return 1;
+}
+
+sub redis_snmp_handler {
+    my ($handler, $registration_info, $request_info, $requests) = @_;
+    my ($request);
+
+    for ($request = $requests; $request; $request = $request->next()) {
+        # Process request for $oid (e.g. redisUptime)
+        my $oid  = $request->getOID();
+        my $mode = $request_info->getMode();
+        my $value;
+        my $next;
+
+        dolog(LOG_DEBUG, "asking for oid $oid (mode $mode)") if ($opt{verbose});
+        if ($error) {
+            dolog(LOG_DEBUG, "error for oid $oid (mode $mode)") if ($opt{verbose});
+            $request->setError($request_info, SNMP_ERR_NOSUCHNAME);
+            next;
+        }
+
+        if ($mode == MODE_GET) {
+            set_value($request, $oid, $request_info);
+        }
+
+        if ($mode == MODE_GETNEXT) {
+            if ($oid < $lowestOid) {
+                set_value($request, $lowestOid, $request_info);
+            }
+            elsif ($oid < $highestOid) #request is somewhere in our range, so return first one after it
+            {
+                my $lasti = 0;
+                my $i = 0;
+                my $oidToUse = undef;
+
+                #linear search of sorted keys array.
+                do {
+                    $oidToUse = $ks[$i];
+                    $i++;
+                } while (NetSNMP::OID::compare($oid, $oidToUse) > -1 and $i <= scalar @ks);
+
+                #got one to return
+                if (defined $oidToUse) {
+                    dolog(LOG_DEBUG, "Next oid to $oid is $oidToUse") if ($opt{verbose});
+                    while (!set_value($request, $oidToUse, $request_info)) {
+                        # got not value, we need to get the next oid
+                        $oidToUse = $ks[$i];
+                        $i++;
+                        last if $i > scalar @ks;
+                    }
+                }
+            }
+        }
+    }
+    dolog(LOG_DEBUG, "finished processing") if ($opt{verbose});
+}
+
+sub dolog {
+    my ($level, $msg) = @_;
+    syslog($level, $msg);
+    print STDERR $msg . "\n" if ($opt{verbose});
+}
+
+sub VersionMessage {
+    print "redis-snmp $VERSION by brice.figureau\@daysofwonder.com\n";
+}
+
+sub run
+{
+    netsnmp_ds_set_boolean(NETSNMP_DS_APPLICATION_ID, NETSNMP_DS_AGENT_NO_ROOT_ACCESS, 1);
+    my $agent = new NetSNMP::agent('Name' => 'redis', 'AgentX' => 1);
+
+    GetOptions(
+        \%opt,
+        'host|h=s',
+        'port|P=i',
+        'password|p=s',
+        'oid|o',
+        'refresh|r=i',
+        'daemon_pid|daemon-pid=s',
+        'no-daemon|n',
+        'man',
+        'usage',
+        'verbose|v+',
+        'version|V' => sub {VersionMessage()},
+    ) or pod2usage(-verbose => 0);
+
+    pod2usage(-verbose => 0) if $opt{usage};
+    pod2usage(-verbose => 1) if $opt{help};
+    pod2usage(-verbose => 2) if $opt{man};
+
+    my $subagent  = 0;
+
+    openlog("redis-snmp", LOG_PID | LOG_PERROR, LOG_DAEMON);
+
+    daemonize() if !$opt{'no-daemon'};
+
+    $regOID = new NetSNMP::OID($opt{oid});
+    $agent->register("redis", $regOID, \&redis_snmp_handler);
+
+    # build the oids table
+    my $i = 1;
+    foreach my $oidname (@newkeys) {
+        $oids{$regOID . ".$i.0"} = {
+            'name' => $oidname,
+            'oid'  => new NetSNMP::OID($regOID . ".$i.0")
+        };
+        $i++;
+    }
+
+    # this contains a lexicographycally sorted oids array
+    @ks = sort {$a <=> $b} map {$_ = new NetSNMP::OID($_)} keys %oids;
+    $lowestOid  = $ks[0];
+    $highestOid = $ks[$#ks];
+
+    if ($opt{verbose}) {
+        foreach my $k (@ks) {
+            dolog(LOG_DEBUG, "$k -> " . $oids{$k}->{'name'});
+        }
+    }
+
+
+    # We need to perform a loop here waiting for snmp requests.     We
+    # also check for new STATUS data.
+    $SIG{'INT'}  = \&shut_it_down;
+    $SIG{'QUIT'} = \&shut_it_down;
+    $SIG{'TERM'} = \&shut_it_down;
+    $running = 1;
+
+    while ($running) {
+        refresh_status($opt{oid}, $opt{host}, $opt{port});
+        $agent->agent_check_and_process(1);    # 1 = block
+    }
+    $agent->shutdown();
+
+    dolog(LOG_INFO, "agent shutdown");
+}
+
+__END__
+
+=head1 NAME
+
+    redis-snmp - report redis statistics via SNMP 
+ 
+=head1 SYNOPSIS
+ 
+    redis-snmp [options]
+
+    -h HOST, --host=HOST      connect to Redis on HOST
+    -P PORT, --port=PORT      port to connect (default 6379)
+    -p PASS, --password=PASS  use PASS as password to connect to redis
+    -o OID, --oid=OID         registering OID
+    -r INT, --refresh=INT     set refresh interval to INT (seconds)
+    --daemon-pid=FILE         write PID to FILE instead of $default{pid}
+    -n, --no-daemon           do not detach and become a daemon
+    -v, --verbose             be verbose about what you do
+
+    -?, --help                display this help and exit
+    --usage                   display detailed usage information
+    --man                     display program man page
+    -V, --version             output version information and exit
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<-h HOST, --host=HOST>
+
+connect to Redis on HOST
+
+=item B<-P PORT, --port=PORT>
+
+port to connect (default 6379)
+
+=item B<-p PASS, --password=PASS>
+
+use PASS as password to connect to redis
+
+=item B<-o OID, --oid=OID>
+
+registering OID
+
+=item B<-r INT, --refresh=INT>
+
+refresh interval in seconds
+
+=item B<--daemon-pid=FILE>
+
+write PID to FILE instead of $default{pid}
+
+=item B<-n, --no-daemon>
+
+do not detach and become a daemon
+
+=item B<-v, --verbose>
+
+be verbose about what you do
+
+=item B<--man>
+
+Prints the manual page and exits.
+
+=item B<--usage>
+
+Prints detailed usage information and exits.
+
+=item B<-?, --help>
+
+Print a brief help message and exits.
+
+=item B<-V, --version>
+
+output version information and exit
+
+=back
+
+=head1 DESCRIPTION
+
+B<redis-snmp> is a small daemon that connects to a local snmpd daemon
+to report statistics on a local or remote Redis server.
+
+=cut

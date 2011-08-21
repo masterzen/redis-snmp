@@ -1,0 +1,116 @@
+-- Redis Server: SNMP Subagent
+-- 
+-- Copyright (C) 2011 Brice Figureau
+-- Copyright (C) 2011 Days of Wonder, Inc.
+--
+-- This program is free software; you can redistribute it and/or
+-- modify it under the terms of the GNU General Public License
+-- as published by the Free Software Foundation; either version 2
+-- of the License, or (at your option) any later version.
+-- 
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-- GNU General Public License for more details.
+-- 
+-- You should have received a copy of the GNU General Public License
+-- along with this program; if not, write to the Free Software
+-- Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+--
+
+REDIS-SERVER-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE,
+    enterprises, Counter32, Gauge32,
+    IpAddress, Unsigned32, Counter64
+    FROM SNMPv2-SMI
+
+    TEXTUAL-CONVENTION, DisplayString, TimeStamp,
+    TruthValue
+    FROM SNMPv2-TC
+
+    CounterBasedGauge64
+    FROM HCNUM-TC
+
+    MODULE-COMPLIANCE, OBJECT-GROUP, NOTIFICATION-GROUP
+    FROM SNMPv2-CONF;
+
+redis		MODULE-IDENTITY
+    LAST-UPDATED "201108150000Z"	-- Aug. 15, 2011
+    ORGANIZATION "Days of Wonder, Inc."
+    CONTACT-INFO
+    "Days of Wonder
+    334 State Street, Suite 203
+    Los Altos, CA 94022
+    USA"
+    DESCRIPTION
+    "This MIB describes a MySQL Database Server counters."
+
+    REVISION "200807140000Z"	    -- Jul. 14, 2008
+    DESCRIPTION
+    "The original version of this MIB."
+    ::= { enterprises 20267 400 }
+
+-- Current Redis core MIB entries
+--  reStatus		OBJECT IDENTIFIER ::= { redis 1 }
+
+redisUnsigned64 ::= TEXTUAL-CONVENTION
+    STATUS  current
+    DESCRIPTION
+    "A 64 bits unsigned (which doesn't exist in SMIv2) containing any unsigned 64 bits
+    integer number. It is defined as a Counter64 but doesn't carry the counter semantic"
+    
+    SYNTAX  Counter64
+
+redisStatus		OBJECT IDENTIFIER ::= { redis 1 }
+
+redisConnectedClients OBJECT-TYPE
+    SYNTAX	Gauge32
+    MAX-ACCESS	read-only
+    STATUS	current
+    DESCRIPTION
+    "The number of clients connected to this server"
+    ::= { redisStatus 1 }
+
+redisConnectedSlaves OBJECT-TYPE
+    SYNTAX	Gauge32
+    MAX-ACCESS	read-only
+    STATUS	current
+    DESCRIPTION
+    "The number of slaves connected to this server"
+    ::= { redisStatus 2 }
+
+redisUsedMemory OBJECT-TYPE
+    SYNTAX	redisUnsigned64
+    MAX-ACCESS	read-only
+    STATUS	current
+    DESCRIPTION
+    "The number of bytes allocated by redis"
+    ::= { redisStatus 3 }
+
+redisChangesSinceLastSave OBJECT-TYPE
+    SYNTAX	Gauge32
+    MAX-ACCESS	read-only
+    STATUS	current
+    DESCRIPTION
+    "The number of changes since last BGSAVE"
+    ::= { redisStatus 4 }
+
+redisTotalConnections OBJECT-TYPE
+    SYNTAX	Counter64
+    MAX-ACCESS	read-only
+    STATUS	current
+    DESCRIPTION
+    "The number of connections since server start"
+    ::= { redisStatus 5 }
+
+redisCommandsProcessed OBJECT-TYPE
+    SYNTAX	Counter64
+    MAX-ACCESS	read-only
+    STATUS	current
+    DESCRIPTION
+    "The number of commands served since server start"
+    ::= { redisStatus 6 }
+
+END
