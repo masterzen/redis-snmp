@@ -1,0 +1,12 @@
+
+    <!-- REDIS-SERVER MIB -->
+    <group name="redis" ifType="ignore">
+        <mibObj oid=".1.3.6.1.4.1.20267.400.1.1" instance="0" alias="redisConnectedClnts" type="Gauge32" />
+        <mibObj oid=".1.3.6.1.4.1.20267.400.1.2" instance="0" alias="redisConnectedSlavs" type="Gauge32" />
+        <mibObj oid=".1.3.6.1.4.1.20267.400.1.3" instance="0" alias="redisUsedMemory" type="Gauge64" />
+        <mibObj oid=".1.3.6.1.4.1.20267.400.1.4" instance="0" alias="redisChangsSncLstSv" type="Gauge32" />
+        <mibObj oid=".1.3.6.1.4.1.20267.400.1.5" instance="0" alias="redisTotalConnectns" type="Counter64" />
+        <mibObj oid=".1.3.6.1.4.1.20267.400.1.6" instance="0" alias="redisCommandsPrcssd" type="Counter64" />
+    </group>
+
+

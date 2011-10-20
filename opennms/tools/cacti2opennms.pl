@@ -1,10 +1,10 @@
 #!/usr/bin/perl
 #
 # This is a script that generates OpenNMS config files from the MySQL Cacti
-# Templates mysql_definitions.pl file and the cacti to mib mapping
+# Templates redis_definitions.pl file and the cacti to mib mapping
 #
 # Usage:
-#   perl cacti2opennms.pl mysql_definitions.pl cacti2MIB.pl
+#   perl cacti2opennms.pl redis_definitions.pl cacti2MIB.pl
 #
 #
 # This script is loosely based on make-templates.pl written by Baron Schwartz 
@@ -60,6 +60,7 @@ sub read_hash {
     if ( $EVAL_ERROR ) {
        die $EVAL_ERROR;
     }
+
     return $t;
 }
 
@@ -88,7 +89,7 @@ if (scalar(@ARGV) != 2) {
     pod2usage(-verbose => 0);
 }
 
-# read mysql template
+# read redis template
 my $t = read_hash(shift @ARGV);
 
 # now read the cacti to MIB translation hash
@@ -144,12 +145,12 @@ sub emit_report {
     my $list = shift;
 
    print <<END;
-report.mysql.${rname}.name=$g->{name}
-report.mysql.${rname}.columns=$list
-report.mysql.${rname}.type=nodeSnmp
-report.mysql.${rname}.width=$opt{graph_width}
-report.mysql.${rname}.height=$opt{graph_height}
-report.mysql.${rname}.command=--title "$g->{title}" \\
+report.redis.${rname}.name=$g->{name}
+report.redis.${rname}.columns=$list
+report.redis.${rname}.type=nodeSnmp
+report.redis.${rname}.width=$opt{graph_width}
+report.redis.${rname}.height=$opt{graph_height}
+report.redis.${rname}.command=--title "$g->{title}" \\
  --width $opt{graph_width} \\
  --height $opt{graph_height} \\
 END
@@ -211,8 +212,8 @@ END
 
 sub emit_datacollection {
     print <<END;
-    <!-- MySQL-SERVER MIB -->
-        <group name="mysql" ifType="ignore">
+    <!-- REDIS-SERVER MIB -->
+        <group name="redis" ifType="ignore">
 END
     my $i = 0;
     foreach my $mib ( @mibKeysInOrder )
@@ -237,14 +238,16 @@ LOOP:
         # skip graphs we don't (yet) support
         my $it;
         foreach $it ( @{ $g->{items} } ) {
-            unless(defined($cacti2MIB->{short_names}->{$it->{item}})) {
+            my $item = $it->{item};
+            unless(defined($cacti2MIB->{short_names}->{$item})) {
+                print "skipping unknown graph: $it->{item}\n";
                 next LOOP;
             }
             my $rname = condense($g->{name});
             $reports{$rname} = '';
         }
     }
-    print join(', ', map { "mysql.".$_ } keys %reports) . " \\\n";
+    print join(', ', map { "redis.".$_ } keys %reports) . " \\\n";
     print "\n\n";
 }
 
@@ -254,7 +257,9 @@ LOOP:
         # skip graphs we don't (yet) support
         my $it;
         foreach $it ( @{ $g->{items} } ) {
-            unless(defined($cacti2MIB->{short_names}->{$it->{item}})) {
+            my $item = $it->{item};
+            unless(defined($cacti2MIB->{short_names}->{$item})) {
+                print "skipping unknown graph: $it->{item}\n";
                 next LOOP;
             }
         }
@@ -336,7 +341,7 @@ sub emit_agent {
     print ");\n\n";
 
     print "my \@oldkeys = (\n";
-    array_print(2, map { $mib2Cacti{$_} } @mibKeysInOrder);
+    array_print(2, map { my $n = $mib2Cacti{$_} ; $n =~ s/^REDIS_//; $n } @mibKeysInOrder);
     print ");\n\n";
 }
 
@@ -366,11 +371,11 @@ __END__
 
 =head1 NAME
 
-    cacti2opennsm - create opennms configuration from MySQL Cacti Templates 
+    cacti2opennms - create opennms configuration from Redis Cacti Templates 
 
 =head1 SYNOPSIS
 
-    cacti2opennms [options] mysql_definitions.pl cacti2mib.pl
+    cacti2opennms [options] redis_definitions.pl cacti2mib.pl
 
     -w, --graph_width WIDTH          width of graph in pixel
     -h, --graph_height HEIGHT        height of graph in pixel
@@ -399,7 +404,7 @@ Possible choices are:
   * graph: outputs the content of the snmp-graph.properties
   * graphlist: outputs the content of the snmp-graph.properties reports key
   * datacollection: outputs the content of the datacollections-config.xml file
-  * agent: outputs the needed array for mysql-snmp
+  * agent: outputs the needed array for redis-snmp
 
 =item B<--man>
 
@@ -421,7 +426,7 @@ output version information and exit
 
 =head1 DESCRIPTION
 
-B<mysql-snmp> is a small daemon that connects to a local snmpd daemon
-to report statistics on a local or remote MySQL server.
+B<redis-snmp> is a small daemon that connects to a local snmpd daemon
+to report statistics on a local or remote Redis server.
 
 =cut

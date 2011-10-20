@@ -3,7 +3,7 @@
 # This file contains the mapping from MySQL cacti templates to the MIB names, value and
 # and types. This file is used to generate the opennms configuration.
 #
-# (c) Copryright 2009 - Brice Figureau
+# (c) Copryright 2011 - Brice Figureau
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,12 +20,12 @@
 
 {   name        => 'Cacti 2 MIB',
     short_names => {
-        'connected_clients'           => { mib => 'redisConnectedClients',      order => 1, type => 'Gauge32' },
-        'connected_slaves'            => { mib => 'redisConnectedSlaves',       order => 2, type => 'Gauge32' },
-        'used_memory'                 => { mib => 'redisUsedMemory',            order => 3, type => 'Gauge64' },
-        'changes_since_last_save'     => { mib => 'redisChangesSinceLastSave',  order => 4, type => 'Gauge32' },
-        'total_connections_received'  => { mib => 'redisTotalConnections',      order => 5, type => 'Counter64' },
-        'total_commands_processed'    => { mib => 'redisCommandsProcessed',     order => 6, type => 'Counter64' },
+        'REDIS_connected_clients'           => { mib => 'redisConnectedClients',      order => 1, type => 'Gauge32' },
+        'REDIS_connected_slaves'            => { mib => 'redisConnectedSlaves',       order => 2, type => 'Gauge32' },
+        'REDIS_used_memory'                 => { mib => 'redisUsedMemory',            order => 3, type => 'Gauge64' },
+        'REDIS_changes_since_last_save'     => { mib => 'redisChangesSinceLastSave',  order => 4, type => 'Gauge32' },
+        'REDIS_total_connections_received'  => { mib => 'redisTotalConnections',      order => 5, type => 'Counter64' },
+        'REDIS_total_commands_processed'    => { mib => 'redisCommandsProcessed',     order => 6, type => 'Counter64' },
     },
     startoid => '.1.3.6.1.4.1.20267.400.1',
 }
