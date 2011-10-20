@@ -79,56 +79,54 @@ my @oldkeys = (
 run() unless caller();
 
 sub read_response($) {
-  my $sock = shift;
+    my $sock = shift;
 
-  my ($type, $result) = read_line($sock);
+    my ($type, $result) = read_line($sock);
 
-  if ($type eq '-') {
-    confess "Redis error $result, ";
-  }
-  elsif ($type eq '+') {
-    return $result;
-  }
-  elsif ($type eq '$') {
-    return if $result < 0;
-    return read_len($sock, $result + 2);
-  }
-  else {
-    confess "return type not implemented: $type ($result), ";
-  }
+    if ($type eq '-') {
+        confess "Redis error: $result";
+    }
+    elsif ($type eq '+') {
+        return $result;
+    }
+    elsif ($type eq '$') {
+        return if $result < 0;
+        return read_len($sock, $result + 2);
+    }
+    else {
+        confess "return type not implemented: $type ($result), ";
+    }
 }
 
 sub read_line($) {
-  my $sock = shift;
+    my $sock = shift;
 
-  my $data = <$sock>;
-  confess("Error while reading from Redis server: $!")
-    unless defined $data;
+    my $data = <$sock>;
+    confess("Error while reading from Redis server: $!") unless defined $data;
 
-  chomp $data;
+    chomp $data;
 
-  my $type = substr($data, 0, 1, '');
-  return ($type, $data);
+    my $type = substr($data, 0, 1, '');
+    return ($type, $data);
 }
 
 sub read_len($$) {
-  my ($sock, $len) = @_;
+    my ($sock, $len) = @_;
 
-  my $data;
-  my $offset = 0;
-  while ($len) {
-    my $bytes = read $sock, $data, $len, $offset;
-    confess("Error while reading from Redis server: $!")
-      unless defined $bytes;
-    confess("Redis server closed connection") unless $bytes;
+    my $data;
+    my $offset = 0;
+    while ($len) {
+        my $bytes = read $sock, $data, $len, $offset;
+        confess("Error while reading from Redis server: $!") unless defined $bytes;
+        confess("Redis server closed connection") unless $bytes;
 
-    $offset += $bytes;
-    $len -= $bytes;
-  }
+        $offset += $bytes;
+        $len -= $bytes;
+    }
 
-  chomp $data;
+    chomp $data;
 
-  return $data;
+    return $data;
 }
 
 sub send_buffer($$) {
@@ -309,12 +307,12 @@ sub set_value {
     return 1;
 }
 
-sub redis_snmp_handler {
+sub my_snmp_handler {
     my ($handler, $registration_info, $request_info, $requests) = @_;
     my ($request);
 
     for ($request = $requests; $request; $request = $request->next()) {
-        # Process request for $oid (e.g. redisUptime)
+        # Process request for $oid (e.g. mysqlUptime)
         my $oid  = $request->getOID();
         my $mode = $request_info->getMode();
         my $value;
@@ -332,10 +330,10 @@ sub redis_snmp_handler {
         }
 
         if ($mode == MODE_GETNEXT) {
-            if ($oid < $lowestOid) {
+            if (NetSNMP::OID::compare($oid, $lowestOid) < 0) {
                 set_value($request, $lowestOid, $request_info);
             }
-            elsif ($oid < $highestOid) #request is somewhere in our range, so return first one after it
+            elsif (NetSNMP::OID::compare($oid, $highestOid) <= 0) #request is somewhere in our range, so return first one after it
             {
                 my $lasti = 0;
                 my $i = 0;
@@ -345,10 +343,14 @@ sub redis_snmp_handler {
                 do {
                     $oidToUse = $ks[$i];
                     $i++;
-                } while (NetSNMP::OID::compare($oid, $oidToUse) > -1 and $i <= scalar @ks);
+                } while (NetSNMP::OID::compare($oid, $oidToUse) > -1 and $i < scalar @ks);
 
                 #got one to return
                 if (defined $oidToUse) {
+                    if (NetSNMP::OID::compare($oid, $oidToUse) == 0) {
+                        dolog(LOG_DEBUG, "GETNEXT $oid == $oidToUse, no next, returning nothing") if ($opt{verbose});
+                        next;
+                    }
                     dolog(LOG_DEBUG, "Next oid to $oid is $oidToUse") if ($opt{verbose});
                     while (!set_value($request, $oidToUse, $request_info)) {
                         # got not value, we need to get the next oid
@@ -366,7 +368,7 @@ sub redis_snmp_handler {
 sub dolog {
     my ($level, $msg) = @_;
     syslog($level, $msg);
-    print STDERR $msg . "\n" if ($opt{verbose});
+    print STDOUT $msg . "\n" if ($opt{verbose});
 }
 
 sub VersionMessage {
@@ -448,10 +450,10 @@ __END__
 
 =head1 NAME
 
-    redis-snmp - report redis statistics via SNMP 
- 
+    redis-snmp - report redis statistics via SNMP
+
 =head1 SYNOPSIS
- 
+
     redis-snmp [options]
 
     -h HOST, --host=HOST      connect to Redis on HOST
