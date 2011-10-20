@@ -307,7 +307,7 @@ sub set_value {
     return 1;
 }
 
-sub my_snmp_handler {
+sub redis_snmp_handler {
     my ($handler, $registration_info, $request_info, $requests) = @_;
     my ($request);
 
