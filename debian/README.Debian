@@ -1,0 +1,11 @@
+redis-snmp for Debian
+---------------------
+
+Snmp should allow AgentX.
+This can be done by adding:
+
+master agentx
+
+into /etc/snmp/snmpd.conf and reloading snmpd
+
+ -- brice <brice+debian@daysofwonder.com>  Thu, 20 Oct 2011 11:18:31 +0100

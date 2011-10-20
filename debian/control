@@ -1,0 +1,14 @@
+Source: redis-snmp
+Section: admin
+Priority: extra
+Maintainer: Brice Figureau <brice+debian@daysofwonder.com>
+Build-Depends: debhelper (>= 5)
+Standards-Version: 3.7.2
+
+Package: redis-snmp
+Architecture: all
+Depends: ${perl:Depends}, snmpd, libsnmp-perl, libunix-syslog-perl, ${shlibs:Depends}, ${misc:Depends}
+Description: SNMP agent for redis-server
+ This package contains a SNMP agent/subagent to expose redis-server
+ internal counters to SNMP.
+
