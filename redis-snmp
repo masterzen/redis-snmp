@@ -435,7 +435,7 @@ sub run
         'host|h=s',
         'port|P=i',
         'password|p=s',
-        'oid|o',
+        'oid|o=s',
         'refresh|r=i',
         'daemon_pid|daemon-pid=s',
         'no-daemon|n',
