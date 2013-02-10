@@ -36,12 +36,76 @@ use NetSNMP::default_store qw(:all);
 use SNMP;
 use Pod::Usage;
 
-my $VERSION = "v0.1_01";
+my $VERSION = "v0.2_00";
 $VERSION = eval $VERSION;
 
+## Packages ##
+package RedisInfoParser;
+
+use strict;
+use warnings;
+use Data::Dumper;
+
+my %redis_keys = (
+    '2.2' => [
+      'connected_clients', 'connected_slaves',  # 1 - 2
+      'used_memory', 'changes_since_last_save',  # 3 - 4
+      'total_connections_received', 'total_commands_processed',  # 5 - 6
+    ],
+    '2.4' => [
+      'connected_clients', 'connected_slaves',  # 1 - 2
+      'used_memory', 'changes_since_last_save',  # 3 - 4
+      'total_connections_received', 'total_commands_processed',  # 5 - 6
+    ],
+    '2.6' => [
+      'connected_clients', 'connected_slaves',  # 1 - 2
+      'used_memory', 'rdb_changes_since_last_save',  # 3 - 4
+      'total_connections_received', 'total_commands_processed',  # 5 - 6
+    ],
+);
+
+sub new {
+   bless {}, shift;
+}
+
+sub parse {
+  my $self = shift;
+  my $info = shift;
+  my $hash = {map { split(/:/, $_, 2) } grep {!/^#.*$/} split(/\r\n/, $info)};
+  return $hash;
+}
+
+sub to_snmp {
+  my $self = shift;
+  my $status = shift;
+  my %output;
+  my %trans;
+
+  my $redis_version = $status->{'redis_version'};
+
+  $redis_version =~ s/^(\d+\.\d+).*$/$1/;
+  $redis_version = '2.2' unless (exists($redis_keys{$redis_version}));
+
+  my $i = 0;
+  foreach my $key (@{$redis_keys{$redis_version}}) {
+      $trans{$key} = $i++;
+  }
+
+  foreach my $key (keys %$status) {
+      $output{$trans{$key}} = $status->{$key} if (exists($trans{$key}));
+  }
+  return \%output;
+}
+
+# end of package RedisParser
+package main;
+
+use strict;
+use warnings;
+use Data::Dumper;
 
 my %opt = (
-    daemon_pid => '/var/run/mysql-snmp.pid',
+    daemon_pid => '/var/run/redis-snmp.pid',
     oid        => '1.3.6.1.4.1.20267.400.1',
     port       => 6379,
     refresh    => 300,
@@ -68,12 +132,6 @@ my @newkeys = (
     'redisConnectedClients', 'redisConnectedSlaves',  # 1 - 2
     'redisUsedMemory', 'redisChangesSinceLastSave',  # 3 - 4
     'redisTotalConnections', 'redisCommandsProcessed',  # 5 - 6
-);
-
-my @oldkeys = (
-    'connected_clients', 'connected_slaves',  # 1 - 2
-    'used_memory', 'changes_since_last_save',  # 3 - 4
-    'total_connections_received', 'total_commands_processed',  # 5 - 6
 );
 
 run() unless caller();
@@ -162,7 +220,7 @@ sub redis_send_info_command($) {
 
 sub fetch_redis_data {
     my ($host, $port, $pass) = @_;
-    my %output;
+    my $output;
     eval {
         my $sock = IO::Socket::INET->new(
           PeerAddr => "$host:$port",
@@ -177,23 +235,15 @@ sub fetch_redis_data {
         redis_send_info_command($sock);
         my $info = read_response($sock);
         chop($info);
-        my $status = {map { split(/:/, $_, 2) } split(/\r\n/, $info)};
-
-        my %trans;
-        my $i = 0;
-        foreach my $key (@oldkeys) {
-            $trans{$key} = $newkeys[$i++];
-        }
-
-        foreach my $key (keys %$status) {
-            $output{$trans{$key}} = $status->{$key} if (exists($trans{$key}));
-        }
+        my $redis_parser = RedisInfoParser->new();
+        my $status = $redis_parser->parse($info);
+        $output = $redis_parser->to_snmp($status);
     };
     if ($@) {
         dolog(LOG_CRIT, "can't refresh data from redis: $@\n");
         return (undef, undef, undef);
     }
-    return(\@newkeys, \@types, \%output);
+    return(\@newkeys, \@types, $output);
 }
 
 # daemonize the program
@@ -239,7 +289,7 @@ sub refresh_status {
         $error = 0;
         my $index = 0;
         foreach my $key (@$oid) {
-            $global_status{$key}{'value'} = $status->{$key};
+            $global_status{$key}{'value'} = $status->{$index};
             $global_status{$key}{'type'}  = $types->[$index];
             $index++;
         }
