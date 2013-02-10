@@ -22,22 +22,17 @@ REDIS-SERVER-MIB DEFINITIONS ::= BEGIN
 
 IMPORTS
     MODULE-IDENTITY, OBJECT-TYPE, NOTIFICATION-TYPE,
-    enterprises, Counter32, Gauge32,
-    IpAddress, Unsigned32, Counter64
+    enterprises, Counter32, Gauge32, Unsigned32, Counter64
     FROM SNMPv2-SMI
 
-    TEXTUAL-CONVENTION, DisplayString, TimeStamp,
-    TruthValue
+    TEXTUAL-CONVENTION
     FROM SNMPv2-TC
 
-    CounterBasedGauge64
-    FROM HCNUM-TC
-
-    MODULE-COMPLIANCE, OBJECT-GROUP, NOTIFICATION-GROUP
+    MODULE-COMPLIANCE, OBJECT-GROUP
     FROM SNMPv2-CONF;
 
 redis		MODULE-IDENTITY
-    LAST-UPDATED "201108150000Z"	-- Aug. 15, 2011
+    LAST-UPDATED "201302080000Z"	-- Feb. 08, 2013
     ORGANIZATION "Days of Wonder, Inc."
     CONTACT-INFO
     "Days of Wonder
@@ -47,15 +42,20 @@ redis		MODULE-IDENTITY
     DESCRIPTION
     "This MIB describes a MySQL Database Server counters."
 
-    REVISION "200807140000Z"	    -- Jul. 14, 2008
+    REVISION "201302080000Z"	    -- Feb. 08, 2013
     DESCRIPTION
     "The original version of this MIB."
-    ::= { enterprises 20267 400 }
+
+    REVISION "201108150000Z"	    -- Aug. 15, 2011
+    DESCRIPTION
+    "The original version of this MIB."
+
+    ::= { enterprises daysofwonder(20267) 400 }
 
 -- Current Redis core MIB entries
---  reStatus		OBJECT IDENTIFIER ::= { redis 1 }
 
-redisUnsigned64 ::= TEXTUAL-CONVENTION
+REDISUnsigned64 ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d"
     STATUS  current
     DESCRIPTION
     "A 64 bits unsigned (which doesn't exist in SMIv2) containing any unsigned 64 bits
@@ -82,7 +82,7 @@ redisConnectedSlaves OBJECT-TYPE
     ::= { redisStatus 2 }
 
 redisUsedMemory OBJECT-TYPE
-    SYNTAX	redisUnsigned64
+    SYNTAX	REDISUnsigned64
     MAX-ACCESS	read-only
     STATUS	current
     DESCRIPTION
@@ -112,5 +112,40 @@ redisCommandsProcessed OBJECT-TYPE
     DESCRIPTION
     "The number of commands served since server start"
     ::= { redisStatus 6 }
+
+-- conformance information
+
+redisMIBConformance OBJECT IDENTIFIER ::= { redis 2 }
+
+redisMIBCompliances OBJECT IDENTIFIER ::= { redisMIBConformance 1 }
+redisMIBGroups      OBJECT IDENTIFIER ::= { redisMIBConformance 2 }
+
+-- compliance statements
+
+redisMIBCompliance MODULE-COMPLIANCE
+    STATUS  current
+    DESCRIPTION
+    "The compliance statement for SNMPv2 entities which implement REDIS."
+    MODULE  -- this module
+    MANDATORY-GROUPS { redisGroup }
+    ::= { redisMIBCompliances 1 }
+
+-- units of conformance
+
+redisGroup OBJECT-GROUP
+    OBJECTS   {
+      redisConnectedClients,
+      redisConnectedSlaves,
+      redisUsedMemory,
+      redisChangesSinceLastSave,
+      redisTotalConnections,
+      redisCommandsProcessed
+    }
+    STATUS    current
+    DESCRIPTION
+     "The group of objects providing for management of REDIS entities."
+    ::= { redisMIBGroups 1 }
+
+
 
 END
