@@ -32,7 +32,7 @@ IMPORTS
     FROM SNMPv2-CONF;
 
 redis		MODULE-IDENTITY
-    LAST-UPDATED "201302080000Z"	-- Feb. 08, 2013
+    LAST-UPDATED "201302160000Z"	-- Feb. 16, 2013
     ORGANIZATION "Days of Wonder, Inc."
     CONTACT-INFO
     "Days of Wonder
@@ -42,9 +42,13 @@ redis		MODULE-IDENTITY
     DESCRIPTION
     "This MIB describes a MySQL Database Server counters."
 
+    REVISION "201302160000Z"	    -- Feb. 16, 2013
+    DESCRIPTION
+    "Added the object redisCPUSys and redisCPUUsr."
+
     REVISION "201302080000Z"	    -- Feb. 08, 2013
     DESCRIPTION
-    "The original version of this MIB."
+    "Conformance and mib validation."
 
     REVISION "201108150000Z"	    -- Aug. 15, 2011
     DESCRIPTION
@@ -113,6 +117,22 @@ redisCommandsProcessed OBJECT-TYPE
     "The number of commands served since server start"
     ::= { redisStatus 6 }
 
+redisCPUSys OBJECT-TYPE
+    SYNTAX	Counter32
+    MAX-ACCESS	read-only
+    STATUS	current
+    DESCRIPTION
+    "The number of 1/100 s spent running redis sys code on the CPU"
+    ::= { redisStatus 7 }
+
+redisCPUUsr OBJECT-TYPE
+    SYNTAX	Counter32
+    MAX-ACCESS	read-only
+    STATUS	current
+    DESCRIPTION
+    "The number of 1/100 s spent running redis user code on the CPU"
+    ::= { redisStatus 8 }
+
 -- conformance information
 
 redisMIBConformance OBJECT IDENTIFIER ::= { redis 2 }
@@ -139,7 +159,9 @@ redisGroup OBJECT-GROUP
       redisUsedMemory,
       redisChangesSinceLastSave,
       redisTotalConnections,
-      redisCommandsProcessed
+      redisCommandsProcessed,
+      redisCPUSys,
+      redisCPUUsr
     }
     STATUS    current
     DESCRIPTION

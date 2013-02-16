@@ -51,16 +51,19 @@ my %redis_keys = (
       'connected_clients', 'connected_slaves',  # 1 - 2
       'used_memory', 'changes_since_last_save',  # 3 - 4
       'total_connections_received', 'total_commands_processed',  # 5 - 6
+      'used_cpu_sys', 'used_cpu_user',  # 7 - 8
     ],
     '2.4' => [
       'connected_clients', 'connected_slaves',  # 1 - 2
       'used_memory', 'changes_since_last_save',  # 3 - 4
       'total_connections_received', 'total_commands_processed',  # 5 - 6
+      'used_cpu_sys', 'used_cpu_user',  # 7 - 8
     ],
     '2.6' => [
       'connected_clients', 'connected_slaves',  # 1 - 2
       'used_memory', 'rdb_changes_since_last_save',  # 3 - 4
       'total_connections_received', 'total_commands_processed',  # 5 - 6
+      'used_cpu_sys', 'used_cpu_user',  # 7 - 8
     ],
 );
 
@@ -94,6 +97,7 @@ sub to_snmp {
   foreach my $key (keys %$status) {
       $output{$trans{$key}} = $status->{$key} if (exists($trans{$key}));
   }
+
   return \%output;
 }
 
@@ -124,14 +128,15 @@ my @ks;
 my $regOID;
 
 my @types = (
-    'Gauge32', 'Gauge32', 'Counter64', 'Gauge32',  # 1 - 4
-    'Counter64', 'Counter64',  # 5 - 6
+    'Gauge32', 'Gauge32', 'Counter64', 'Gauge32',         # 1 - 4
+    'Counter64', 'Counter64', 'Counter32', 'Counter32',   # 5 - 8
 );
 
 my @newkeys = (
-    'redisConnectedClients', 'redisConnectedSlaves',  # 1 - 2
-    'redisUsedMemory', 'redisChangesSinceLastSave',  # 3 - 4
+    'redisConnectedClients', 'redisConnectedSlaves',    # 1 - 2
+    'redisUsedMemory', 'redisChangesSinceLastSave',     # 3 - 4
     'redisTotalConnections', 'redisCommandsProcessed',  # 5 - 6
+    'redisCPUSys', 'redisCPUUsr',                       # 7 - 8
 );
 
 run() unless caller();
@@ -289,6 +294,9 @@ sub refresh_status {
         $error = 0;
         my $index = 0;
         foreach my $key (@$oid) {
+            if ($key eq 'redisCPUSys' || $key eq 'redisCPUUsr') {
+              $status->{$index} *= 100;
+            }
             $global_status{$key}{'value'} = $status->{$index};
             $global_status{$key}{'type'}  = $types->[$index];
             $index++;
