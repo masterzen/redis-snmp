@@ -48,22 +48,61 @@ use Data::Dumper;
 
 my %redis_keys = (
     '2.2' => [
-      'connected_clients', 'connected_slaves',  # 1 - 2
-      'used_memory', 'changes_since_last_save',  # 3 - 4
-      'total_connections_received', 'total_commands_processed',  # 5 - 6
-      'used_cpu_sys', 'used_cpu_user',  # 7 - 8
+      'connected_clients', # 1
+      'connected_slaves', # 2
+      'used_memory', # 3
+      'changes_since_last_save', # 4
+      'total_connections_received', # 5
+      'total_commands_processed', # 6
+      'used_cpu_sys', # 7
+      'used_cpu_user', # 8
+      'blocked_clients', # 9
+      'evicted_keys', # 10
+      'expired_keys', # 11
+      'keyspace_hits', # 12
+      'keyspace_misses', # 13
+      'pubsub_channels', # 14
+      'pubsub_patterns', # 15
+      'uptime_in_seconds', # 16
+      'used_memory_rss', #17
     ],
     '2.4' => [
-      'connected_clients', 'connected_slaves',  # 1 - 2
-      'used_memory', 'changes_since_last_save',  # 3 - 4
-      'total_connections_received', 'total_commands_processed',  # 5 - 6
-      'used_cpu_sys', 'used_cpu_user',  # 7 - 8
+      'connected_clients', # 1
+      'connected_slaves', # 2
+      'used_memory', # 3
+      'changes_since_last_save', # 4
+      'total_connections_received', # 5
+      'total_commands_processed', # 6
+      'used_cpu_sys', # 7
+      'used_cpu_user',  # 8
+      'blocked_clients', # 9
+      'evicted_keys', # 10
+      'expired_keys', # 11
+      'keyspace_hits', # 12
+      'keyspace_misses', # 13
+      'pubsub_channels', # 14
+      'pubsub_patterns', # 15
+      'uptime_in_seconds', # 16
+      'used_memory_rss', #17
     ],
     '2.6' => [
-      'connected_clients', 'connected_slaves',  # 1 - 2
-      'used_memory', 'rdb_changes_since_last_save',  # 3 - 4
-      'total_connections_received', 'total_commands_processed',  # 5 - 6
-      'used_cpu_sys', 'used_cpu_user',  # 7 - 8
+      'connected_clients', # 1
+      'connected_slaves', # 2
+      'used_memory', # 3
+      'rdb_changes_since_last_save',  # 4
+      'total_connections_received', # 5 
+      'total_commands_processed', # 6
+      'used_cpu_sys', # 7
+      'used_cpu_user', # 8
+      'blocked_clients', # 9
+      'evicted_keys', # 10
+      'expired_keys', # 11
+      'keyspace_hits', # 12
+      'keyspace_misses', # 13
+      'pubsub_channels', # 14
+      'pubsub_patterns', # 15
+      'uptime_in_seconds', # 16
+      'used_memory_rss', #17
     ],
 );
 
@@ -128,15 +167,44 @@ my @ks;
 my $regOID;
 
 my @types = (
-    'Gauge32', 'Gauge32', 'Counter64', 'Gauge32',         # 1 - 4
-    'Counter64', 'Counter64', 'Counter32', 'Counter32',   # 5 - 8
+    'Gauge32', # 1
+    'Gauge32', # 2
+    'Counter64', # 3
+    'Gauge32', # 4
+    'Counter64', # 5
+    'Counter64', # 6
+    'Counter32', # 7
+    'Counter32', # 8
+    'Gauge32', # 9
+    'Counter64', # 10
+    'Counter64', # 11
+    'Counter64', # 12
+    'Counter64', # 13
+    'Gauge32', # 14
+    'Gauge32', # 15
+    'Gauge32', # 16
+    'Gauge32', #17
+
 );
 
 my @newkeys = (
-    'redisConnectedClients', 'redisConnectedSlaves',    # 1 - 2
-    'redisUsedMemory', 'redisChangesSinceLastSave',     # 3 - 4
-    'redisTotalConnections', 'redisCommandsProcessed',  # 5 - 6
-    'redisCPUSys', 'redisCPUUsr',                       # 7 - 8
+    'redisConnectedClients', # 1
+    'redisConnectedSlaves', # 2
+    'redisUsedMemory', # 3
+    'redisChangesSinceLastSave', # 4
+    'redisTotalConnections', # 5
+    'redisCommandsProcessed', # 6
+    'redisCPUSys', # 7
+    'redisCPUUsr', # 8
+    'redisBlockedClients', # 9
+    'redisEvictedKeys', # 10
+    'redisExpiredKeys', # 11
+    'redisKeyspaceHits', # 12
+    'redisKeyspaceMisses', # 13
+    'redisPubsubChannels', # 14
+    'redisPubsubPatterns', # 15
+    'redisUptime', # 16
+    'redisUsedMemoryRss', #17
 );
 
 run() unless caller();
@@ -242,6 +310,12 @@ sub fetch_redis_data {
         chop($info);
         my $redis_parser = RedisInfoParser->new();
         my $status = $redis_parser->parse($info);
+        if($opt{verbose}) {
+          dolog(LOG_DEBUG, "Redis status");
+          foreach my $key (keys %$status) {
+            dolog(LOG_DEBUG, "   $key: $status->{$key}");
+          }
+        }
         $output = $redis_parser->to_snmp($status);
     };
     if ($@) {

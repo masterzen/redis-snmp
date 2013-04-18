@@ -32,7 +32,7 @@ IMPORTS
     FROM SNMPv2-CONF;
 
 redis		MODULE-IDENTITY
-    LAST-UPDATED "201302160000Z"	-- Feb. 16, 2013
+    LAST-UPDATED "201304170000Z" -- April 17, 2013
     ORGANIZATION "Days of Wonder, Inc."
     CONTACT-INFO
     "Days of Wonder
@@ -40,7 +40,21 @@ redis		MODULE-IDENTITY
     Los Altos, CA 94022
     USA"
     DESCRIPTION
-    "This MIB describes a MySQL Database Server counters."
+    "This MIB describes a collection of Redis server metrics."
+
+    REVISION "201304170000Z" -- April 17, 2013
+    DESCRIPTION
+    "Added additional OIDs:
+      redisBlockedClients,
+      redisEvictedKeys,
+      redisExpiredKeys,
+      redisKeyspaceHits,
+      redisKeyspaceMisses,
+      redisPubsubChannels,
+      redisPubsubPatterns,
+      redisUptime,
+      redisUsedMemoryRss
+    "
 
     REVISION "201302160000Z"	    -- Feb. 16, 2013
     DESCRIPTION
@@ -87,6 +101,7 @@ redisConnectedSlaves OBJECT-TYPE
 
 redisUsedMemory OBJECT-TYPE
     SYNTAX	REDISUnsigned64
+    UNITS "Bytes"
     MAX-ACCESS	read-only
     STATUS	current
     DESCRIPTION
@@ -133,6 +148,82 @@ redisCPUUsr OBJECT-TYPE
     "The number of 1/100 s spent running redis user code on the CPU"
     ::= { redisStatus 8 }
 
+redisBlockedClients OBJECT-TYPE
+    SYNTAX Gauge32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+    "The number of clients pending on a blocking call (BLPOP, BRPOP, BRPOPLPUSH)."
+    ::= { redisStatus 9 }
+
+redisEvictedKeys OBJECT-TYPE
+    SYNTAX Counter64
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+    "Number of evicted keys due to maxmemory limit."
+    ::= { redisStatus 10 }
+
+redisExpiredKeys OBJECT-TYPE
+    SYNTAX Counter64
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+    "Total number of key expiration events."
+    ::= { redisStatus 11 }
+
+redisKeyspaceHits OBJECT-TYPE
+    SYNTAX Counter64
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+    "Number of successful lookup of keys in the main dictionary."
+    ::= { redisStatus 12 }
+
+redisKeyspaceMisses OBJECT-TYPE
+    SYNTAX Counter64
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+    "Number of failed lookup of keys in the main dictionary."
+    ::= { redisStatus 13 }
+
+redisPubsubChannels OBJECT-TYPE
+    SYNTAX Gauge32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+    "Global number of pub/sub channels with client subscriptions."
+    ::= { redisStatus 14 }
+
+redisPubsubPatterns OBJECT-TYPE
+    SYNTAX Gauge32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+    "Global number of pub/sub patterns with client subscriptions."
+    ::= { redisStatus 15 }
+
+redisUptime OBJECT-TYPE
+    SYNTAX Gauge32
+    UNITS "Seconds"
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+    "Uptime of the redis server, in seconds."
+    ::= { redisStatus 16 }
+
+redisUsedMemoryRss OBJECT-TYPE
+    SYNTAX	REDISUnsigned64
+    UNITS "Bytes"
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+    "Number of bytes that Redis allocated as seen by the operating system
+    (a.k.a resident set size). This is the number reported by tools such as
+    top and ps."
+    ::= { redisStatus 17 }
+
 -- conformance information
 
 redisMIBConformance OBJECT IDENTIFIER ::= { redis 2 }
@@ -161,13 +252,20 @@ redisGroup OBJECT-GROUP
       redisTotalConnections,
       redisCommandsProcessed,
       redisCPUSys,
-      redisCPUUsr
+      redisCPUUsr,
+      redisBlockedClients,
+      redisEvictedKeys,
+      redisExpiredKeys,
+      redisKeyspaceHits,
+      redisKeyspaceMisses,
+      redisPubsubChannels,
+      redisPubsubPatterns,
+      redisUptime,
+      redisUsedMemoryRss
     }
     STATUS    current
     DESCRIPTION
      "The group of objects providing for management of REDIS entities."
     ::= { redisMIBGroups 1 }
-
-
 
 END
