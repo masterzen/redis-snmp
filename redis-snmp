@@ -48,96 +48,96 @@ use Data::Dumper;
 
 my %redis_keys = (
     '2.2' => [
-      'connected_clients', # 1
-      'connected_slaves', # 2
-      'used_memory', # 3
-      'changes_since_last_save', # 4
-      'total_connections_received', # 5
-      'total_commands_processed', # 6
-      'used_cpu_sys', # 7
-      'used_cpu_user', # 8
-      'blocked_clients', # 9
-      'evicted_keys', # 10
-      'expired_keys', # 11
-      'keyspace_hits', # 12
-      'keyspace_misses', # 13
-      'pubsub_channels', # 14
-      'pubsub_patterns', # 15
-      'uptime_in_seconds', # 16
-      'used_memory_rss', #17
+        'connected_clients',             # 1
+        'connected_slaves',              # 2
+        'used_memory',                   # 3
+        'changes_since_last_save',       # 4
+        'total_connections_received',    # 5
+        'total_commands_processed',      # 6
+        'used_cpu_sys',                  # 7
+        'used_cpu_user',                 # 8
+        'blocked_clients',               # 9
+        'evicted_keys',                  # 10
+        'expired_keys',                  # 11
+        'keyspace_hits',                 # 12
+        'keyspace_misses',               # 13
+        'pubsub_channels',               # 14
+        'pubsub_patterns',               # 15
+        'uptime_in_seconds',             # 16
+        'used_memory_rss',               #17
     ],
     '2.4' => [
-      'connected_clients', # 1
-      'connected_slaves', # 2
-      'used_memory', # 3
-      'changes_since_last_save', # 4
-      'total_connections_received', # 5
-      'total_commands_processed', # 6
-      'used_cpu_sys', # 7
-      'used_cpu_user',  # 8
-      'blocked_clients', # 9
-      'evicted_keys', # 10
-      'expired_keys', # 11
-      'keyspace_hits', # 12
-      'keyspace_misses', # 13
-      'pubsub_channels', # 14
-      'pubsub_patterns', # 15
-      'uptime_in_seconds', # 16
-      'used_memory_rss', #17
+        'connected_clients',             # 1
+        'connected_slaves',              # 2
+        'used_memory',                   # 3
+        'changes_since_last_save',       # 4
+        'total_connections_received',    # 5
+        'total_commands_processed',      # 6
+        'used_cpu_sys',                  # 7
+        'used_cpu_user',                 # 8
+        'blocked_clients',               # 9
+        'evicted_keys',                  # 10
+        'expired_keys',                  # 11
+        'keyspace_hits',                 # 12
+        'keyspace_misses',               # 13
+        'pubsub_channels',               # 14
+        'pubsub_patterns',               # 15
+        'uptime_in_seconds',             # 16
+        'used_memory_rss',               #17
     ],
     '2.6' => [
-      'connected_clients', # 1
-      'connected_slaves', # 2
-      'used_memory', # 3
-      'rdb_changes_since_last_save',  # 4
-      'total_connections_received', # 5 
-      'total_commands_processed', # 6
-      'used_cpu_sys', # 7
-      'used_cpu_user', # 8
-      'blocked_clients', # 9
-      'evicted_keys', # 10
-      'expired_keys', # 11
-      'keyspace_hits', # 12
-      'keyspace_misses', # 13
-      'pubsub_channels', # 14
-      'pubsub_patterns', # 15
-      'uptime_in_seconds', # 16
-      'used_memory_rss', #17
+        'connected_clients',              # 1
+        'connected_slaves',               # 2
+        'used_memory',                    # 3
+        'rdb_changes_since_last_save',    # 4
+        'total_connections_received',     # 5
+        'total_commands_processed',       # 6
+        'used_cpu_sys',                   # 7
+        'used_cpu_user',                  # 8
+        'blocked_clients',                # 9
+        'evicted_keys',                   # 10
+        'expired_keys',                   # 11
+        'keyspace_hits',                  # 12
+        'keyspace_misses',                # 13
+        'pubsub_channels',                # 14
+        'pubsub_patterns',                # 15
+        'uptime_in_seconds',              # 16
+        'used_memory_rss',                #17
     ],
 );
 
 sub new {
-   bless {}, shift;
+    bless {}, shift;
 }
 
 sub parse {
-  my $self = shift;
-  my $info = shift;
-  my $hash = {map { split(/:/, $_, 2) } grep {!/^#.*$/} split(/\r\n/, $info)};
-  return $hash;
+    my $self = shift;
+    my $info = shift;
+    my $hash = {map {split(/:/, $_, 2)} grep {!/^#.*$/} split(/\r\n/, $info)};
+    return $hash;
 }
 
 sub to_snmp {
-  my $self = shift;
-  my $status = shift;
-  my %output;
-  my %trans;
+    my $self   = shift;
+    my $status = shift;
+    my %output;
+    my %trans;
 
-  my $redis_version = $status->{'redis_version'};
+    my $redis_version = $status->{'redis_version'};
 
-  $redis_version =~ s/^(\d+\.\d+).*$/$1/;
-  $redis_version = '2.2' unless (exists($redis_keys{$redis_version}));
+    $redis_version =~ s/^(\d+\.\d+).*$/$1/;
+    $redis_version = '2.2' unless (exists($redis_keys{$redis_version}));
 
-  my $i = 0;
-  foreach my $key (@{$redis_keys{$redis_version}}) {
-      $trans{$key} = $i++;
-  }
+    my $i = 0;
+    foreach my $key (@{$redis_keys{$redis_version}}) {
+        $trans{$key} = $i++;
+    }
 
-  foreach my $key (keys %$status) {
-      $output{$trans{$key}} = $status->{$key} if (exists($trans{$key}));
-  }
+    foreach my $key (keys %$status) {
+        $output{$trans{$key}} = $status->{$key} if (exists($trans{$key}));
+    }
 
-  return \%output;
+    return \%output;
 }
 
 # end of package RedisParser
@@ -157,54 +157,55 @@ my %opt = (
 
 my %global_status       = ();
 my $global_last_refresh = 0;
-my $running = 0;
-my $error   = 0;
+my $running             = 0;
+my $error               = 0;
+
 # this will hold a table of conversion between numerical oids and oidnames
-my %oids    = ();
+my %oids = ();
 my $lowestOid;
 my $highestOid;
 my @ks;
 my $regOID;
 
 my @types = (
-    'Gauge32', # 1
-    'Gauge32', # 2
-    'Counter64', # 3
-    'Gauge32', # 4
-    'Counter64', # 5
-    'Counter64', # 6
-    'Counter32', # 7
-    'Counter32', # 8
-    'Gauge32', # 9
-    'Counter64', # 10
-    'Counter64', # 11
-    'Counter64', # 12
-    'Counter64', # 13
-    'Gauge32', # 14
-    'Gauge32', # 15
-    'Gauge32', # 16
-    'Gauge32', #17
+    'Gauge32',      # 1
+    'Gauge32',      # 2
+    'Counter64',    # 3
+    'Gauge32',      # 4
+    'Counter64',    # 5
+    'Counter64',    # 6
+    'Counter32',    # 7
+    'Counter32',    # 8
+    'Gauge32',      # 9
+    'Counter64',    # 10
+    'Counter64',    # 11
+    'Counter64',    # 12
+    'Counter64',    # 13
+    'Gauge32',      # 14
+    'Gauge32',      # 15
+    'Gauge32',      # 16
+    'Gauge32',      #17
 
 );
 
 my @newkeys = (
-    'redisConnectedClients', # 1
-    'redisConnectedSlaves', # 2
-    'redisUsedMemory', # 3
-    'redisChangesSinceLastSave', # 4
-    'redisTotalConnections', # 5
-    'redisCommandsProcessed', # 6
-    'redisCPUSys', # 7
-    'redisCPUUsr', # 8
-    'redisBlockedClients', # 9
-    'redisEvictedKeys', # 10
-    'redisExpiredKeys', # 11
-    'redisKeyspaceHits', # 12
-    'redisKeyspaceMisses', # 13
-    'redisPubsubChannels', # 14
-    'redisPubsubPatterns', # 15
-    'redisUptime', # 16
-    'redisUsedMemoryRss', #17
+    'redisConnectedClients',        # 1
+    'redisConnectedSlaves',         # 2
+    'redisUsedMemory',              # 3
+    'redisChangesSinceLastSave',    # 4
+    'redisTotalConnections',        # 5
+    'redisCommandsProcessed',       # 6
+    'redisCPUSys',                  # 7
+    'redisCPUUsr',                  # 8
+    'redisBlockedClients',          # 9
+    'redisEvictedKeys',             # 10
+    'redisExpiredKeys',             # 11
+    'redisKeyspaceHits',            # 12
+    'redisKeyspaceMisses',          # 13
+    'redisPubsubChannels',          # 14
+    'redisPubsubPatterns',          # 15
+    'redisUptime',                  # 16
+    'redisUsedMemoryRss',           #17
 );
 
 run() unless caller();
@@ -216,15 +217,12 @@ sub read_response($) {
 
     if ($type eq '-') {
         confess "Redis error: $result";
-    }
-    elsif ($type eq '+') {
+    } elsif ($type eq '+') {
         return $result;
-    }
-    elsif ($type eq '$') {
+    } elsif ($type eq '$') {
         return if $result < 0;
         return read_len($sock, $result + 2);
-    }
-    else {
+    } else {
         confess "return type not implemented: $type ($result), ";
     }
 }
@@ -262,12 +260,12 @@ sub read_len($$) {
 
 sub send_buffer($$) {
     my $sock = shift;
-    my $buf = shift;
+    my $buf  = shift;
 
     while ($buf) {
-      my $len = syswrite $sock, $buf, length $buf;
-      confess("Could not write to Redis server: $!") unless $len;
-      substr $buf, 0, $len, "";
+        my $len = syswrite $sock, $buf, length $buf;
+        confess("Could not write to Redis server: $!") unless $len;
+        substr $buf, 0, $len, "";
     }
 }
 
@@ -290,14 +288,13 @@ sub redis_send_info_command($) {
     return;
 }
 
-
 sub fetch_redis_data {
     my ($host, $port, $pass) = @_;
     my $output;
     eval {
         my $sock = IO::Socket::INET->new(
-          PeerAddr => "$host:$port",
-          Proto    => 'tcp',
+            PeerAddr => "$host:$port",
+            Proto    => 'tcp',
         ) || confess("Could not connect to Redis server at $host:$port: $!");
 
         if ($pass) {
@@ -309,12 +306,12 @@ sub fetch_redis_data {
         my $info = read_response($sock);
         chop($info);
         my $redis_parser = RedisInfoParser->new();
-        my $status = $redis_parser->parse($info);
-        if($opt{verbose}) {
-          dolog(LOG_DEBUG, "Redis status");
-          foreach my $key (keys %$status) {
-            dolog(LOG_DEBUG, "   $key: $status->{$key}");
-          }
+        my $status       = $redis_parser->parse($info);
+        if ($opt{verbose}) {
+            dolog(LOG_DEBUG, "Redis status");
+            foreach my $key (keys %$status) {
+                dolog(LOG_DEBUG, "   $key: $status->{$key}");
+            }
         }
         $output = $redis_parser->to_snmp($status);
     };
@@ -322,15 +319,16 @@ sub fetch_redis_data {
         dolog(LOG_CRIT, "can't refresh data from redis: $@\n");
         return (undef, undef, undef);
     }
-    return(\@newkeys, \@types, $output);
+    return (\@newkeys, \@types, $output);
 }
 
 # daemonize the program
 sub daemonize {
-    open STDIN, '/dev/null' or die "redis-snmp: can't read /dev/null: $!";
+    open STDIN,  '/dev/null'  or die "redis-snmp: can't read /dev/null: $!";
     open STDOUT, '>/dev/null' or die "redis-snmp: can't write to /dev/null: $!";
     defined(my $pid = fork) or die "redis-snmp: can't fork: $!";
     if ($pid) {
+
         # parent
         open my $pidfile, '>', $opt{daemon_pid}
           or croak "Couldn't open $opt{daemon_pid} for writing: $!";
@@ -343,7 +341,6 @@ sub daemonize {
     setsid() or die "redis-snmp: can't start a new session: $!";
     open STDERR, '>&STDOUT' or die "redis-snmp: can't dup stdout: $!";
 }
-
 
 ###
 ### Called automatically now and then
@@ -358,6 +355,7 @@ sub refresh_status {
 
     # Check if we have been called quicker than once every $refresh
     if (($now - $global_last_refresh) < $opt{refresh}) {
+
         # if yes, do not do anything
         dolog(LOG_DEBUG, "not refreshing: " . ($now - $global_last_refresh) . " < $opt{refresh}") if ($opt{verbose});
         return;
@@ -369,7 +367,7 @@ sub refresh_status {
         my $index = 0;
         foreach my $key (@$oid) {
             if ($key eq 'redisCPUSys' || $key eq 'redisCPUUsr') {
-              $status->{$index} *= 100;
+                $status->{$index} *= 100;
             }
             $global_status{$key}{'value'} = $status->{$index};
             $global_status{$key}{'type'}  = $types->[$index];
@@ -377,8 +375,7 @@ sub refresh_status {
         }
         dolog(LOG_DEBUG, "Refreshed at $now " . (time() - $now)) if ($opt{verbose});
         print Dumper(\%global_status) if ($opt{verbose});
-    }
-    else {
+    } else {
         dolog(LOG_DEBUG, "Setting error to 1") if ($opt{verbose});
         $error = 1;
     }
@@ -391,14 +388,11 @@ sub getASNType {
     my $type = shift;
     if ($type eq 'Counter32') {
         return ASN_COUNTER;
-    }
-    elsif ($type eq 'Gauge32') {
+    } elsif ($type eq 'Gauge32') {
         return ASN_GAUGE;
-    }
-    elsif ($type eq 'Counter64') {
+    } elsif ($type eq 'Counter64') {
         return ASN_COUNTER64;
-    }
-    elsif ($type eq 'OID') {
+    } elsif ($type eq 'OID') {
         return ASN_OBJECT_ID;
     }
     return ASN_OCTET_STR;
@@ -430,8 +424,7 @@ sub set_value {
             }
             $request->setOID($oid);
             $request->setValue(getASNType($global_status{$oidname}{'type'}), "$value");
-        }
-        else {
+        } else {
             dolog(LOG_DEBUG, "OID $oid has no value") if ($opt{verbose});
             return 0;
         }
@@ -444,6 +437,7 @@ sub redis_snmp_handler {
     my ($request);
 
     for ($request = $requests; $request; $request = $request->next()) {
+
         # Process request for $oid (e.g. mysqlUptime)
         my $oid  = $request->getOID();
         my $mode = $request_info->getMode();
@@ -464,11 +458,10 @@ sub redis_snmp_handler {
         if ($mode == MODE_GETNEXT) {
             if (NetSNMP::OID::compare($oid, $lowestOid) < 0) {
                 set_value($request, $lowestOid, $request_info);
-            }
-            elsif (NetSNMP::OID::compare($oid, $highestOid) <= 0) #request is somewhere in our range, so return first one after it
+            } elsif (NetSNMP::OID::compare($oid, $highestOid) <= 0) #request is somewhere in our range, so return first one after it
             {
-                my $lasti = 0;
-                my $i = 0;
+                my $lasti    = 0;
+                my $i        = 0;
                 my $oidToUse = undef;
 
                 #linear search of sorted keys array.
@@ -485,6 +478,7 @@ sub redis_snmp_handler {
                     }
                     dolog(LOG_DEBUG, "Next oid to $oid is $oidToUse") if ($opt{verbose});
                     while (!set_value($request, $oidToUse, $request_info)) {
+
                         # got not value, we need to get the next oid
                         $oidToUse = $ks[$i];
                         $i++;
@@ -507,8 +501,7 @@ sub VersionMessage {
     print "redis-snmp $VERSION by brice.figureau\@daysofwonder.com\n";
 }
 
-sub run
-{
+sub run {
     netsnmp_ds_set_boolean(NETSNMP_DS_APPLICATION_ID, NETSNMP_DS_AGENT_NO_ROOT_ACCESS, 1);
     my $agent = new NetSNMP::agent('Name' => 'redis', 'AgentX' => 1);
 
@@ -531,7 +524,7 @@ sub run
     pod2usage(-verbose => 1) if $opt{help};
     pod2usage(-verbose => 2) if $opt{man};
 
-    my $subagent  = 0;
+    my $subagent = 0;
 
     openlog("redis-snmp", LOG_PID | LOG_PERROR, LOG_DAEMON);
 
@@ -561,13 +554,12 @@ sub run
         }
     }
 
-
     # We need to perform a loop here waiting for snmp requests.     We
     # also check for new STATUS data.
     $SIG{'INT'}  = \&shut_it_down;
     $SIG{'QUIT'} = \&shut_it_down;
     $SIG{'TERM'} = \&shut_it_down;
-    $running = 1;
+    $running     = 1;
 
     while ($running) {
         refresh_status($opt{oid}, $opt{host}, $opt{port});
