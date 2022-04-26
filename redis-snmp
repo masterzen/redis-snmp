@@ -184,7 +184,7 @@ my @types = (
     'Gauge32',      # 14
     'Gauge32',      # 15
     'Gauge32',      # 16
-    'Gauge32',      #17
+    'Counter64',    # 17
 
 );
 
@@ -205,7 +205,7 @@ my @newkeys = (
     'redisPubsubChannels',          # 14
     'redisPubsubPatterns',          # 15
     'redisUptime',                  # 16
-    'redisUsedMemoryRss',           #17
+    'redisUsedMemoryRss',           # 17
 );
 
 run() unless caller();
