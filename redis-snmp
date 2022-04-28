@@ -153,6 +153,7 @@ my %opt = (
     port       => 6379,
     refresh    => 300,
     host       => 'localhost',
+    conf_path  => '/etc/redis/redis.conf',
 );
 
 my %global_status       = ();
@@ -501,6 +502,24 @@ sub VersionMessage {
     print "redis-snmp $VERSION by brice.figureau\@daysofwonder.com\n";
 }
 
+sub read_config {
+    if (defined $opt{password}) {
+        dolog(LOG_DEBUG, "WARNING: The password option has been used but it is recommended to replace it by the \"-c\" option");
+	return;
+    }
+    if (open(CONFIG, "<", $opt{conf_path})) {
+        while(<CONFIG>) {
+            if (/^\s*requirepass\s+\"?([^\"]*)\"?[\s\r\n]*$/) {
+                $opt{password} = $1;
+                dolog(LOG_DEBUG, "Successfully read client password from redis server configuration \"$opt{conf_path}\"");
+                return;
+            }
+	}
+        close(CONFIG);
+    }
+    dolog(LOG_DEBUG, "WARNING: cannot read server configuration \"$opt{conf_path}\"");
+}
+
 sub run {
     netsnmp_ds_set_boolean(NETSNMP_DS_APPLICATION_ID, NETSNMP_DS_AGENT_NO_ROOT_ACCESS, 1);
     my $agent = new NetSNMP::agent('Name' => 'redis', 'AgentX' => 1);
@@ -510,6 +529,7 @@ sub run {
         'host|h=s',
         'port|P=i',
         'password|p=s',
+	'conf_path|conf-path|c=s',
         'oid|o=s',
         'refresh|r=i',
         'daemon_pid|daemon-pid=s',
@@ -527,6 +547,8 @@ sub run {
     my $subagent = 0;
 
     openlog("redis-snmp", LOG_PID | LOG_PERROR, LOG_DAEMON);
+
+    read_config();
 
     daemonize() if !$opt{'no-daemon'};
 
@@ -580,19 +602,20 @@ __END__
 
     redis-snmp [options]
 
-    -h HOST, --host=HOST      connect to Redis on HOST
-    -P PORT, --port=PORT      port to connect (default 6379)
-    -p PASS, --password=PASS  use PASS as password to connect to redis
-    -o OID, --oid=OID         registering OID
-    -r INT, --refresh=INT     set refresh interval to INT (seconds)
-    --daemon-pid=FILE         write PID to FILE instead of $default{pid}
-    -n, --no-daemon           do not detach and become a daemon
-    -v, --verbose             be verbose about what you do
+    -h HOST, --host=HOST       connect to Redis on HOST
+    -P PORT, --port=PORT       port to connect (default 6379)
+    -p PASS, --password=PASS   use PASS as password to connect to redis
+    -c CONF, --conf-path=CONF  path to the redis server configuration
+    -o OID, --oid=OID          registering OID
+    -r INT, --refresh=INT      set refresh interval to INT (seconds)
+    --daemon-pid=FILE          write PID to FILE instead of $default{pid}
+    -n, --no-daemon            do not detach and become a daemon
+    -v, --verbose              be verbose about what you do
 
-    -?, --help                display this help and exit
-    --usage                   display detailed usage information
-    --man                     display program man page
-    -V, --version             output version information and exit
+    -?, --help                 display this help and exit
+    --usage                    display detailed usage information
+    --man                      display program man page
+    -V, --version              output version information and exit
 
 =head1 OPTIONS
 
@@ -608,7 +631,17 @@ port to connect (default 6379)
 
 =item B<-p PASS, --password=PASS>
 
-use PASS as password to connect to redis
+use PASS as password to connect to redis (you should prefer using the
+redis server configuration path because this avoids displaying the
+password in the process table)
+
+=item B<-c CONF, --conf-path=CONF>
+
+path to the redis server configuration (e.g. to read the client password
+that is necessary to get status information from the redis server).
+If you use this otion then you do no more need to use option "-p". Remark:
+Using the configuration path is more secure because it avoids showing the
+password in the process list (e.g. "ps" command).
 
 =item B<-o OID, --oid=OID>
 
@@ -652,5 +685,16 @@ output version information and exit
 
 B<redis-snmp> is a small daemon that connects to a local snmpd daemon
 to report statistics on a local or remote Redis server.
+
+Using the "-c" option (path to redis server configuration) is preferred over
+using the "-p" (redis client password to access server) because it avoids
+showing the password in the process list. If both parameters are given
+then "-p" is used for the pasword because it is more specific.
+
+If you give neither "-p" nor "-c" optione then we try to read the redis
+client password from the default redis server configuration
+("/etc/redis/redis.conf"). In the case that the configuration file has
+another path no password is used. For a cleanly installed redis server
+(with client password set) this should fail.
 
 =cut
