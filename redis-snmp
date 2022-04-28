@@ -151,7 +151,7 @@ my %opt = (
     daemon_pid => '/var/run/redis-snmp.pid',
     oid        => '1.3.6.1.4.1.20267.400.1',
     port       => 6379,
-    refres     => 300,
+    refresh    => 300,
     host       => 'localhost',
     conf_path  => '/etc/redis/redis.conf',
 );
