@@ -28,7 +28,7 @@ Debian
 ------
 
 Please build the package:
-$ dpkg-buildpackage -rfakeroot -uc- b
+$ dpkg-buildpackage -rfakeroot -uc -b
 
 and install it
 Then, modify /etc/default/redis-snmp
